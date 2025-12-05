@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: file-management-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: file-management
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - file-management-network
+
+  # Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: file-management-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/file-management
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_EXPIRES_IN=7d
+      - FTP_ENABLED=${FTP_ENABLED:-true}
+      - FTP_HOST=${FTP_HOST:-127.0.0.1}
+      - FTP_PORT=${FTP_PORT:-12704}
+      - FTP_USER=${FTP_USER:-ftpuser}
+      - FTP_PASSWORD=${FTP_PASSWORD:-123456}
+      - FTP_SECURE=${FTP_SECURE:-false}
+      - FTP_ROOT_PATH=${FTP_ROOT_PATH:-/}
+      - PORT=3000
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_FULL_NAME=${ADMIN_FULL_NAME:-Admin User}
+    volumes:
+      - ./backend/temp:/app/temp
+    depends_on:
+      - mongodb
+    networks:
+      - file-management-network
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: file-management-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - file-management-network
+
+networks:
+  file-management-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+

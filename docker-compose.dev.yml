@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: file-management-mongodb-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: file-management
+    volumes:
+      - mongodb_data_dev:/data/db
+    networks:
+      - file-management-network-dev
+
+  # Backend Service (Development)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: file-management-backend-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/file-management
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_EXPIRES_IN=7d
+      - FTP_ENABLED=${FTP_ENABLED:-true}
+      - FTP_HOST=${FTP_HOST:-127.0.0.1}
+      - FTP_PORT=${FTP_PORT:-12704}
+      - FTP_USER=${FTP_USER:-ftpuser}
+      - FTP_PASSWORD=${FTP_PASSWORD:-123456}
+      - FTP_SECURE=${FTP_SECURE:-false}
+      - FTP_ROOT_PATH=${FTP_ROOT_PATH:-/}
+      - PORT=3000
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_FULL_NAME=${ADMIN_FULL_NAME:-Admin User}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./backend/temp:/app/temp
+    command: yarn start:dev
+    depends_on:
+      - mongodb
+    networks:
+      - file-management-network-dev
+
+  # Frontend Service (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: file-management-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: yarn dev
+    depends_on:
+      - backend
+    networks:
+      - file-management-network-dev
+
+networks:
+  file-management-network-dev:
+    driver: bridge
+
+volumes:
+  mongodb_data_dev:
+
