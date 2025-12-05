@@ -1,5 +1,5 @@
-import { Layout, Menu, Button, Avatar, Dropdown } from 'antd';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Layout, Menu, Avatar, Dropdown } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
 import { useAvatar } from '../hooks/useAvatar';
@@ -12,7 +12,6 @@ interface AdminLayoutProps {
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, logout } = useAuth();
   const { avatarUrl } = useAvatar(user?.avatar);
 

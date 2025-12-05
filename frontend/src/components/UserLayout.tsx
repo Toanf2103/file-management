@@ -1,4 +1,4 @@
-import { Layout, Button, Avatar, Dropdown, Menu } from 'antd';
+import { Layout, Avatar, Dropdown, Menu } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserOutlined, LogoutOutlined, SettingOutlined } from '@ant-design/icons';
