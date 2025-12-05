@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Button, Table, Modal, Form, Input, message, Space, Tag } from 'antd';
+import { Button, Table, Modal, Form, Input, message, Tag } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { projectsService } from '../../services/api';

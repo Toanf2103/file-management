@@ -17,7 +17,6 @@ import {
   Timeline,
 } from 'antd';
 import {
-  PlusOutlined,
   UploadOutlined,
   DownloadOutlined,
   DeleteOutlined,
@@ -27,11 +26,10 @@ import {
   FolderOutlined,
   FileOutlined,
   FolderAddOutlined,
-  FolderOpenOutlined,
   ArrowUpOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
-import { projectsService, filesService, usersService } from '../../services/api';
+import { projectsService, filesService } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import FilePreview from '../../components/FilePreview';
 
@@ -45,6 +43,7 @@ interface File {
   type: 'file' | 'folder';
   parentFolder?: string | null;
   fileSize: number;
+  mimeType?: string; // Thêm mimeType cho FilePreview component
   uploadedBy: {
     email: string;
     fullName: string;
@@ -63,7 +62,7 @@ interface Project {
     fullName: string;
   };
   members: Array<{
-    userId: string;
+    userId: string | { _id: string; email?: string; fullName?: string };
     role: string;
   }>;
 }
@@ -90,7 +89,6 @@ const ProjectDetail = () => {
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null);
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [selectedItemForMove, setSelectedItemForMove] = useState<File | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderBreadcrumb, setFolderBreadcrumb] = useState<any[]>([]);
@@ -131,7 +129,7 @@ const ProjectDetail = () => {
   const loadFiles = async (folderId?: string | null) => {
     setLoading(true);
     try {
-      const data = await filesService.getByProject(id!, folderId);
+      const data = await filesService.getByProject(id!, folderId || undefined);
       setFiles(data);
     } catch (error: any) {
       message.error('Lỗi khi tải danh sách file');
@@ -144,7 +142,7 @@ const ProjectDetail = () => {
     if (!project || !user) return false;
     return project.members?.some(
       (m) => {
-        const memberUserId = typeof m.userId === 'string' ? m.userId : m.userId?._id || m.userId?.toString();
+        const memberUserId = typeof m.userId === 'string' ? m.userId : (m.userId && typeof m.userId === 'object' ? m.userId._id : null);
         return memberUserId === user.id && m.role === 'owner';
       }
     );
@@ -266,7 +264,6 @@ const ProjectDetail = () => {
     try {
       const history = await filesService.getHistory(fileId);
       setFileHistory(history);
-      setSelectedFileId(fileId);
       setHistoryDrawerVisible(true);
     } catch (error: any) {
       message.error('Lỗi khi tải lịch sử');
@@ -618,7 +615,7 @@ const ProjectDetail = () => {
                 .filter(
                   (u) =>
                     !project?.members?.some((m) => {
-                      const memberUserId = typeof m.userId === 'string' ? m.userId : m.userId?._id || m.userId?.toString();
+                      const memberUserId = typeof m.userId === 'string' ? m.userId : (m.userId && typeof m.userId === 'object' ? m.userId._id : null);
                       return memberUserId === u._id;
                     })
                 )
@@ -721,7 +718,13 @@ const ProjectDetail = () => {
 
       <FilePreview
         visible={previewModalVisible}
-        file={previewFile}
+        file={previewFile ? {
+          _id: previewFile._id,
+          name: previewFile.name,
+          originalName: previewFile.originalName,
+          mimeType: previewFile.mimeType || 'application/octet-stream',
+          fileSize: previewFile.fileSize,
+        } : null}
         fileUrl={previewFileUrl}
         onClose={handleClosePreview}
       />
