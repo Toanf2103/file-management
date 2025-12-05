@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Spin, message, Descriptions } from 'antd';
-import FileViewer from 'react-file-viewer';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Modal, Spin, Collapse, Tag, Space, Button } from 'antd';
+import { InfoCircleOutlined, DownloadOutlined } from '@ant-design/icons';
+import DocViewer, { DocViewerRenderers } from '@cyntler/react-doc-viewer';
+import api from '../services/api';
 
 interface FilePreviewProps {
   visible: boolean;
@@ -18,36 +20,47 @@ interface FilePreviewProps {
 const FilePreview: React.FC<FilePreviewProps> = ({ visible, file, fileUrl, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (visible) {
-      setError(null);
-      setLoading(true);
-    }
-  }, [visible]);
-
-  if (!file || !fileUrl) {
-    return null;
-  }
-
-  const getFileType = (mimeType: string): string => {
+  // Helper function để xác định file type - di chuyển ra ngoài để có thể dùng trước early return
+  const getFileTypeFromMime = (mimeType: string | undefined): string => {
+    if (!mimeType) return 'unsupported';
     if (mimeType.startsWith('image/')) return 'image';
     if (mimeType === 'application/pdf') return 'pdf';
-    if (mimeType.includes('word') || mimeType.includes('document')) return 'docx';
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'xlsx';
-    if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) return 'pptx';
+    if (mimeType.includes('word') || mimeType.includes('document') || mimeType.includes('docx')) return 'docx';
+    if (mimeType.includes('excel') || mimeType.includes('spreadsheet') || mimeType.includes('xlsx')) return 'xlsx';
+    if (mimeType.includes('powerpoint') || mimeType.includes('presentation') || mimeType.includes('pptx')) return 'pptx';
     if (mimeType.includes('text')) return 'txt';
     if (mimeType.includes('csv')) return 'csv';
     return 'unsupported';
   };
 
-  const fileType = getFileType(file.mimeType);
+  // Tính fileType ngay cả khi file là null - phải đặt trước hooks
+  const fileType = getFileTypeFromMime(file?.mimeType);
 
-  const onError = (e: Error) => {
-    setError('Không thể preview file này. Vui lòng download để xem.');
-    setLoading(false);
-    console.error('File preview error:', e);
-  };
+  // Tạo documents array cho DocViewer - PHẢI đặt trước early return để tuân thủ quy tắc hooks
+  const documents = useMemo(() => {
+    if (!previewUrl || fileType === 'image') return [];
+    return [{ uri: previewUrl }];
+  }, [previewUrl, fileType]);
+
+  useEffect(() => {
+    if (visible && file) {
+      setError(null);
+      setLoading(true);
+      
+      // Sử dụng fileUrl trực tiếp
+      setPreviewUrl(fileUrl);
+    }
+    
+    return () => {
+      setPreviewUrl(null);
+    };
+  }, [visible, file, fileUrl]);
+
+  if (!file || !fileUrl) {
+    return null;
+  }
 
   const handleImageLoad = () => {
     setLoading(false);
@@ -69,83 +82,199 @@ const FilePreview: React.FC<FilePreviewProps> = ({ visible, file, fileUrl, onClo
     return parts.length > 1 ? parts[parts.length - 1] : '';
   };
 
+
+  const handleDownload = async () => {
+    try {
+      const blob = await api.get(`/files/${file._id}/download`, { responseType: 'blob' }).then((res) => res.data);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.originalName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      console.error('Download error:', error);
+      setError('Không thể download file');
+    }
+  };
+
+  const renderFilePreview = () => {
+    if (error) {
+      return (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <p style={{ color: '#ff4d4f', fontSize: '16px', marginBottom: '8px' }}>{error}</p>
+          <p style={{ color: '#666', marginBottom: '16px' }}>File type: {file.mimeType}</p>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>
+            Download để xem
+          </Button>
+        </div>
+      );
+    }
+
+    if (fileType === 'unsupported') {
+      return (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>Loại file này không được hỗ trợ preview.</p>
+          <p style={{ color: '#666', marginBottom: '16px' }}>File type: {file.mimeType}</p>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>
+            Download để xem
+          </Button>
+        </div>
+      );
+    }
+
+    if (fileType === 'image') {
+      return (
+        <div
+          style={{
+            height: '75vh',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'auto',
+            background: '#f5f5f5',
+            borderRadius: '8px',
+          }}
+        >
+          {loading && (
+            <Spin size="large" style={{ position: 'absolute' }} />
+          )}
+          <img
+            src={fileUrl}
+            alt={file.name || file.originalName}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+              display: loading ? 'none' : 'block',
+            }}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+          />
+        </div>
+      );
+    }
+
+    if (fileType === 'docx' || fileType === 'xlsx' || fileType === 'pptx') {
+      // Office documents - sử dụng DocViewer với blob URL
+      return (
+        <div style={{ height: '75vh', border: '1px solid #e8e8e8', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+          {loading && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 10,
+              }}
+            >
+              <Spin size="large" />
+            </div>
+          )}
+          <DocViewer
+            documents={documents}
+            pluginRenderers={DocViewerRenderers}
+            config={{
+              header: {
+                disableHeader: false,
+                disableFileName: false,
+                retainURLParams: false,
+              },
+            }}
+            style={{ height: '100%' }}
+            onDocumentChange={() => setLoading(false)}
+          />
+          {documents.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '50px' }}>
+              <p style={{ marginBottom: '16px' }}>Đang tải file...</p>
+              <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownload}>
+                Download để xem
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // PDF và các file khác sử dụng DocViewer
+    return (
+      <div style={{ height: '75vh', overflow: 'hidden', borderRadius: '8px' }} key={file._id}>
+        <DocViewer
+          documents={documents}
+          pluginRenderers={DocViewerRenderers}
+          config={{
+            header: {
+              disableHeader: false,
+              disableFileName: false,
+              retainURLParams: false,
+            },
+          }}
+          style={{ height: '100%' }}
+        />
+      </div>
+    );
+  };
+
   return (
     <Modal
-      title={file.name || file.originalName}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{file.name || file.originalName}</span>
+          <Tag color="blue">{getFileExtension(file.originalName)?.toUpperCase() || 'FILE'}</Tag>
+        </div>
+      }
       open={visible}
       onCancel={onClose}
       footer={null}
-      width="90%"
-      style={{ top: 20 }}
+      width="95%"
+      style={{ top: 10 }}
       destroyOnClose
+      styles={{
+        body: { padding: '16px', maxHeight: '85vh', overflow: 'auto' },
+      }}
     >
-      <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="Tiêu đề file">
-          {file.name || '(Không có)'}
-        </Descriptions.Item>
-        <Descriptions.Item label="Tên file">
-          {file.originalName} {getFileExtension(file.originalName) && `(.${getFileExtension(file.originalName)})`}
-        </Descriptions.Item>
-        <Descriptions.Item label="Kích thước">
-          {formatFileSize(file.fileSize)}
-        </Descriptions.Item>
-        <Descriptions.Item label="Loại file">
-          {file.mimeType}
-        </Descriptions.Item>
-      </Descriptions>
-      <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
-        {error ? (
-          <div style={{ textAlign: 'center', padding: '50px' }}>
-            <p style={{ color: 'red' }}>{error}</p>
-            <p>File type: {file.mimeType}</p>
-            <p>Loại file này không được hỗ trợ preview. Vui lòng download để xem.</p>
-          </div>
-        ) : fileType === 'unsupported' ? (
-          <div style={{ textAlign: 'center', padding: '50px' }}>
-            <p>Loại file này không được hỗ trợ preview.</p>
-            <p>File type: {file.mimeType}</p>
-            <p>Vui lòng download để xem.</p>
-          </div>
-        ) : fileType === 'image' ? (
-          <div style={{ 
-            height: '70vh', 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            overflow: 'auto',
-            background: '#f5f5f5'
-          }}>
-            {loading && (
-              <Spin size="large" style={{ position: 'absolute' }} />
-            )}
-            <img
-              src={fileUrl}
-              alt={file.name || file.originalName}
-              style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-                display: loading ? 'none' : 'block'
-              }}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-            />
-          </div>
-        ) : (
-          <div style={{ height: '70vh', overflow: 'auto' }} key={file._id}>
-            <FileViewer
-              fileType={fileType}
-              filePath={fileUrl}
-              onError={onError}
-              errorComponent={<div>Lỗi khi load file</div>}
-              unsupportedComponent={<div>File không được hỗ trợ</div>}
-            />
-          </div>
-        )}
-      </div>
+      <Collapse
+        ghost
+        defaultActiveKey={[]}
+        style={{ marginBottom: '16px' }}
+        items={[
+          {
+            key: 'info',
+            label: (
+              <Space>
+                <InfoCircleOutlined />
+                <span>Thông tin file</span>
+              </Space>
+            ),
+            children: (
+              <div style={{ padding: '8px 0' }}>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Tiêu đề:</strong> {file.name || '(Không có)'}
+                </div>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Tên file:</strong> {file.originalName}
+                  {getFileExtension(file.originalName) && (
+                    <Tag style={{ marginLeft: '8px' }}>.{getFileExtension(file.originalName)}</Tag>
+                  )}
+                </div>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Kích thước:</strong> {formatFileSize(file.fileSize)}
+                </div>
+                <div>
+                  <strong>Loại file:</strong> <Tag>{file.mimeType}</Tag>
+                </div>
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      <div style={{ position: 'relative' }}>{renderFilePreview()}</div>
     </Modal>
   );
 };
 
 export default FilePreview;
-
