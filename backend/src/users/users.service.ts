@@ -127,5 +127,55 @@ export class UsersService {
     user.avatar = avatarPath;
     return user.save();
   }
+
+  async findOrCreateGoogleUser(googleProfile: {
+    googleId: string;
+    email: string;
+    fullName: string;
+    avatar?: string;
+  }): Promise<UserDocument> {
+    // Tìm user theo Google ID
+    let user = await this.userModel.findOne({ googleId: googleProfile.googleId });
+    
+    if (user) {
+      // Cập nhật thông tin nếu có thay đổi
+      if (googleProfile.avatar && user.avatar !== googleProfile.avatar) {
+        user.avatar = googleProfile.avatar;
+        await user.save();
+      }
+      return user;
+    }
+
+    // Tìm user theo email (nếu đã đăng ký bằng email)
+    user = await this.userModel.findOne({ email: googleProfile.email });
+    
+    if (user) {
+      // Liên kết Google account với user hiện tại
+      user.googleId = googleProfile.googleId;
+      user.isGoogleUser = true;
+      if (googleProfile.avatar) {
+        user.avatar = googleProfile.avatar;
+      }
+      await user.save();
+      return user;
+    }
+
+    // Tạo user mới
+    user = new this.userModel({
+      email: googleProfile.email,
+      fullName: googleProfile.fullName,
+      googleId: googleProfile.googleId,
+      isGoogleUser: true,
+      avatar: googleProfile.avatar || '',
+      password: '', // Không cần password cho Google user
+      role: UserRole.USER,
+    });
+
+    return user.save();
+  }
+
+  async findByGoogleId(googleId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ googleId }).exec();
+  }
 }
 

@@ -82,6 +82,12 @@ export class File {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ unique: true, sparse: true }) // Token để chia sẻ file/folder
+  shareToken: string;
+
+  @Prop({ default: false }) // Có cho phép chia sẻ qua URL không
+  isShareable: boolean;
 }
 
 export const FileSchema = SchemaFactory.createForClass(File);

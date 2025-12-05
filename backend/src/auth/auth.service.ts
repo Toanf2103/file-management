@@ -37,5 +37,27 @@ export class AuthService {
       },
     };
   }
+
+  async googleLogin(googleProfile: {
+    googleId: string;
+    email: string;
+    fullName: string;
+    avatar?: string;
+  }) {
+    // Tìm hoặc tạo user từ Google profile
+    const user = await this.usersService.findOrCreateGoogleUser(googleProfile);
+    
+    const payload = { email: user.email, sub: user._id, role: user.role };
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        avatar: user.avatar || '',
+        role: user.role,
+      },
+    };
+  }
 }
 
