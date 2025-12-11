@@ -26,6 +26,17 @@ export const getConfig = (key: keyof RuntimeConfig, fallback?: string): string =
   return fallback || '';
 };
 
-// Export các giá trị config thường dùng
-export const API_URL = getConfig('VITE_API_URL', 'http://localhost:3000');
+// ❌ KHÔNG export constant - nó sẽ được tính toán tại build time
+// export const API_URL = getConfig('VITE_API_URL', 'http://localhost:3000');
 
+// ✅ Export getter function - sẽ được tính toán mỗi lần gọi
+export const getApiUrl = (): string => {
+  return getConfig('VITE_API_URL', 'http://localhost:3000');
+};
+
+// Hoặc dùng getter property (cú pháp đẹp hơn)
+export const config = {
+  get apiUrl(): string {
+    return getConfig('VITE_API_URL', 'http://localhost:3000');
+  }
+};

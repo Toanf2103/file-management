@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_URL } from '../config/runtime-config';
+import { config } from '../config/runtime-config';
 
 const api = axios.create({
   baseURL: '/api',
@@ -91,8 +91,10 @@ export const usersService = {
     if (!avatarPath) return null;
     const token = localStorage.getItem('token');
     if (!token) return null;
+    // ✅ Sử dụng getter để lấy API URL động
+    const apiUrl = config.apiUrl;
     // Tạo URL với token trong query param (tạm thời, tốt hơn là dùng blob URL)
-    return `${API_URL}/files/download-avatar?path=${encodeURIComponent(avatarPath)}&token=${encodeURIComponent(token)}`;
+    return `${apiUrl}/files/download-avatar?path=${encodeURIComponent(avatarPath)}&token=${encodeURIComponent(token)}`;
   },
   getAvatarBlob: async (avatarPath: string): Promise<string | null> => {
     if (!avatarPath) return null;
@@ -161,4 +163,3 @@ export const filesService = {
 };
 
 export default api;
-
