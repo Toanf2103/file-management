@@ -13,7 +13,7 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   console.log('API Request:', {
-    url: config.url,
+    url: config,
     method: config.method,
     hasToken: !!token,
     tokenLength: token?.length || 0,
@@ -38,7 +38,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', {
-      url: error.config?.url,
+      url: error.config,
       status: error.response?.status,
       statusText: error.response?.statusText,
       message: error.response?.data?.message || error.message,
